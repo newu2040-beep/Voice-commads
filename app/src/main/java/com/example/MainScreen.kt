@@ -3,15 +3,27 @@ package com.example
 import android.Manifest
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.provider.Settings
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.MicOff
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Build
+import androidx.compose.material.icons.filled.PlayArrow
+import androidx.compose.material.icons.filled.List
+import com.example.voice.data.CommandHistory
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -19,12 +31,14 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.example.voice.data.CustomCommand
 import com.google.accompanist.permissions.ExperimentalPermissionsApi
 import com.google.accompanist.permissions.MultiplePermissionsState
 import com.google.accompanist.permissions.rememberMultiplePermissionsState
@@ -33,14 +47,30 @@ import com.google.accompanist.permissions.rememberMultiplePermissionsState
 @Composable
 fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
+    val isDarkMode by viewModel.isDarkMode.collectAsState()
+    val themeIndex by viewModel.themeIndex.collectAsState()
+    val customCommands by viewModel.allCustomCommands.collectAsState()
+    val commandHistory by viewModel.commandHistory.collectAsState()
     
+    var showSettingsDialog by remember { mutableStateOf(false) }
+    var showCustomCommandsDialog by remember { mutableStateOf(false) }
+    var showHistoryDialog by remember { mutableStateOf(false) }
+
+    val context = LocalContext.current
+
     val permissionsState = rememberMultiplePermissionsState(
         permissions = listOf(
             Manifest.permission.RECORD_AUDIO,
             Manifest.permission.CALL_PHONE,
             Manifest.permission.READ_CONTACTS,
             Manifest.permission.CAMERA
-        )
+        ).let { 
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                it + Manifest.permission.POST_NOTIFICATIONS
+            } else {
+                it
+            }
+        }
     )
 
     Scaffold(
@@ -67,6 +97,32 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                         )
                     }
                 },
+                actions = {
+                    IconButton(onClick = { 
+                        if (Settings.canDrawOverlays(context)) {
+                            val intent = Intent(context, com.example.service.FloatingVoiceService::class.java)
+                            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
+                                context.startForegroundService(intent)
+                            } else {
+                                context.startService(intent)
+                            }
+                        } else {
+                            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+                            context.startActivity(intent)
+                        }
+                    }) {
+                        Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = "Start Floating Bubble", tint = MaterialTheme.colorScheme.onBackground)
+                    }
+                    IconButton(onClick = { showHistoryDialog = true }) {
+                        Icon(imageVector = Icons.Filled.List, contentDescription = "History", tint = MaterialTheme.colorScheme.onBackground)
+                    }
+                    IconButton(onClick = { showCustomCommandsDialog = true }) {
+                        Icon(imageVector = Icons.Filled.Build, contentDescription = "Custom Commands", tint = MaterialTheme.colorScheme.onBackground)
+                    }
+                    IconButton(onClick = { showSettingsDialog = true }) {
+                        Icon(imageVector = Icons.Filled.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onBackground)
+                    }
+                },
                 colors = TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.background
                 )
@@ -85,6 +141,33 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             PermissionRequestContent(
                 modifier = Modifier.padding(paddingValues),
                 permissionsState = permissionsState
+            )
+        }
+
+        if (showSettingsDialog) {
+            SettingsDialog(
+                isDarkMode = isDarkMode,
+                themeIndex = themeIndex,
+                onDismiss = { showSettingsDialog = false },
+                onDarkModeToggle = { viewModel.setDarkMode(it) },
+                onThemeSelected = { viewModel.setTheme(it) }
+            )
+        }
+
+        if (showCustomCommandsDialog) {
+            CustomCommandsDialog(
+                commands = customCommands,
+                onDismiss = { showCustomCommandsDialog = false },
+                onAddCommand = { phrase, type, data -> viewModel.addCustomCommand(phrase, type, data) },
+                onDeleteCommand = { id -> viewModel.deleteCustomCommand(id) }
+            )
+        }
+
+        if (showHistoryDialog) {
+            HistoryDialog(
+                history = commandHistory,
+                onDismiss = { showHistoryDialog = false },
+                onClearHistory = { viewModel.clearHistory() }
             )
         }
     }
@@ -146,18 +229,33 @@ fun VoiceAssistantContent(
                 horizontalArrangement = Arrangement.spacedBy(4.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf(24.dp, 40.dp, 56.dp, 40.dp, 24.dp).forEach { height ->
+                // Animate bars
+                val transition = rememberInfiniteTransition(label = "bars")
+                val animations = (0..4).map { i ->
+                    transition.animateFloat(
+                        initialValue = 0.5f,
+                        targetValue = 1.5f,
+                        animationSpec = infiniteRepeatable(
+                            animation = tween(400, delayMillis = i * 100, easing = LinearOutSlowInEasing),
+                            repeatMode = RepeatMode.Reverse
+                        ),
+                        label = "bar_$i"
+                    )
+                }
+
+                val baseHeights = listOf(24.dp, 40.dp, 56.dp, 40.dp, 24.dp)
+                baseHeights.forEachIndexed { index, height ->
                     Box(
                         modifier = Modifier
                             .width(6.dp)
-                            .height(height)
+                            .height(height * animations[index].value)
                             .clip(CircleShape)
                             .background(MaterialTheme.colorScheme.primary)
                     )
                 }
             }
         } else {
-            Spacer(modifier = Modifier.height(56.dp)) // Placeholder height
+            Spacer(modifier = Modifier.height(84.dp)) // Placeholder height for max animation height
         }
 
         Spacer(modifier = Modifier.height(16.dp))
@@ -210,10 +308,26 @@ fun VoiceAssistantContent(
         // Mic FAB area
         Box(contentAlignment = Alignment.Center, modifier = Modifier.padding(bottom = 32.dp)) {
             // Background ripple circle
+            val infiniteTransition = rememberInfiniteTransition(label = "pulse")
+            val scale by infiniteTransition.animateFloat(
+                initialValue = 1f,
+                targetValue = if (uiState.isListening) 1.5f else 1f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(1000),
+                    repeatMode = RepeatMode.Reverse
+                ),
+                label = "scale"
+            )
+
             Box(
                 modifier = Modifier
                     .size(128.dp)
-                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f), CircleShape)
+                    .clip(CircleShape)
+                    .background(MaterialTheme.colorScheme.primary.copy(alpha = 0.1f))
+                    .graphicsLayer { 
+                        scaleX = scale
+                        scaleY = scale
+                    }
             )
 
             // Mic FAB
@@ -242,6 +356,209 @@ fun VoiceAssistantContent(
             }
         }
     }
+}
+
+@Composable
+fun SettingsDialog(
+    isDarkMode: Boolean,
+    themeIndex: Int,
+    onDismiss: () -> Unit,
+    onDarkModeToggle: (Boolean) -> Unit,
+    onThemeSelected: (Int) -> Unit
+) {
+    val themes = listOf("Ocean", "Emerald", "Violet", "Rose", "Sunset", "Slate")
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Settings") },
+        text = {
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                ) {
+                    Text("Dark Mode", modifier = Modifier.weight(1f))
+                    Switch(checked = isDarkMode, onCheckedChange = onDarkModeToggle)
+                }
+                
+                Spacer(modifier = Modifier.height(16.dp))
+                Text("Theme", style = MaterialTheme.typography.titleSmall)
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                themes.forEachIndexed { index, themeName ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onThemeSelected(index) }
+                            .padding(vertical = 8.dp)
+                    ) {
+                        RadioButton(
+                            selected = themeIndex == index,
+                            onClick = { onThemeSelected(index) }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(themeName)
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+}
+
+@Composable
+fun CustomCommandsDialog(
+    commands: List<CustomCommand>,
+    onDismiss: () -> Unit,
+    onAddCommand: (String, String, String) -> Unit,
+    onDeleteCommand: (Int) -> Unit
+) {
+    var showAddDialog by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Custom Commands") },
+        text = {
+            if (commands.isEmpty()) {
+                Text("No custom commands defined yet.")
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxHeight(0.6f)) {
+                    items(commands) { command ->
+                        Card(
+                            modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(16.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(command.phrase, fontWeight = FontWeight.Bold)
+                                    Text("${command.actionType}: ${command.actionData}", style = MaterialTheme.typography.bodySmall)
+                                }
+                                IconButton(onClick = { onDeleteCommand(command.id) }) {
+                                    Icon(imageVector = Icons.Filled.Delete, contentDescription = "Delete")
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = { showAddDialog = true }) {
+                Text("Add Command")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
+
+    if (showAddDialog) {
+        var phrase by remember { mutableStateOf("") }
+        var actionType by remember { mutableStateOf("RESPONSE") }
+        var actionData by remember { mutableStateOf("") }
+
+        AlertDialog(
+            onDismissRequest = { showAddDialog = false },
+            title = { Text("Add Command") },
+            text = {
+                Column {
+                    OutlinedTextField(
+                        value = phrase,
+                        onValueChange = { phrase = it },
+                        label = { Text("Command Phrase") }
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    
+                    Text("Action Type", style = MaterialTheme.typography.labelMedium)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        RadioButton(selected = actionType == "RESPONSE", onClick = { actionType = "RESPONSE" })
+                        Text("Response", modifier = Modifier.padding(end = 8.dp))
+                        RadioButton(selected = actionType == "APP", onClick = { actionType = "APP" })
+                        Text("App (Package)")
+                    }
+                    
+                    Spacer(modifier = Modifier.height(8.dp))
+                    OutlinedTextField(
+                        value = actionData,
+                        onValueChange = { actionData = it },
+                        label = { Text(if (actionType == "APP") "App Name/Package" else "Text to Speak") }
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    if (phrase.isNotBlank() && actionData.isNotBlank()) {
+                        onAddCommand(phrase.trim(), actionType, actionData.trim())
+                        showAddDialog = false
+                    }
+                }) {
+                    Text("Save")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showAddDialog = false }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+}
+
+
+@Composable
+fun HistoryDialog(
+    history: List<CommandHistory>,
+    onDismiss: () -> Unit,
+    onClearHistory: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Command History") },
+        text = {
+            if (history.isEmpty()) {
+                Text("No voice commands yet.")
+            } else {
+                LazyColumn(modifier = Modifier.fillMaxHeight(0.7f)) {
+                    items(history) { item ->
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(vertical = 4.dp),
+                            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                        ) {
+                            Column(modifier = Modifier.padding(12.dp)) {
+                                Text(item.commandText, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(item.responseText, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                Spacer(modifier = Modifier.height(6.dp))
+                                Text(item.getFormattedTime(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f))
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onClearHistory) {
+                Text("Clear All")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Close")
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalPermissionsApi::class)

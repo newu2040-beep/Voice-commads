@@ -9,8 +9,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.theme.MyApplicationTheme
 
 class MainActivity : ComponentActivity() {
@@ -18,8 +21,12 @@ class MainActivity : ComponentActivity() {
     super.onCreate(savedInstanceState)
     enableEdgeToEdge()
     setContent {
-      MyApplicationTheme {
-        MainScreen()
+      val viewModel: MainViewModel = viewModel()
+      val isDarkMode by viewModel.isDarkMode.collectAsState()
+      val themeIndex by viewModel.themeIndex.collectAsState()
+
+      MyApplicationTheme(isDarkMode = isDarkMode, themeIndex = themeIndex) {
+        MainScreen(viewModel = viewModel)
       }
     }
   }

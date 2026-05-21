@@ -11,6 +11,9 @@ import android.provider.ContactsContract
 import android.provider.MediaStore
 import android.provider.Settings
 import android.util.Log
+import java.util.Date
+import java.util.Locale
+import java.text.SimpleDateFormat
 
 class ActionExecutor(private val context: Context) {
 
@@ -32,7 +35,50 @@ class ActionExecutor(private val context: Context) {
             }
             lowerCommand.contains("bluetooth") -> openSettings(Settings.ACTION_BLUETOOTH_SETTINGS, "Bluetooth settings")
             lowerCommand.contains("wifi") || lowerCommand.contains("wi-fi") -> openSettings(Settings.ACTION_WIFI_SETTINGS, "Wi-Fi settings")
+            lowerCommand.contains("time") -> {
+                val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+                "The current time is ${sdf.format(Date())}"
+            }
+            lowerCommand.contains("date") || lowerCommand.contains("day") -> {
+                val sdf = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault())
+                "Today is ${sdf.format(Date())}"
+            }
+            lowerCommand.contains("plus") || lowerCommand.contains("+") -> calculateMath(lowerCommand)
+            lowerCommand.contains("minus") || lowerCommand.contains("-") -> calculateMath(lowerCommand)
+            lowerCommand.contains("generate") -> "I am an offline assistant and cannot generate custom AI text content without a connected API."
+            lowerCommand.contains("who are you") -> "I am Aura AI, a local voice assistant operating on your device."
             else -> "Command not supported."
+        }
+    }
+    
+    private fun calculateMath(command: String): String {
+        try {
+            val words = command.split(" ")
+            var result = 0.0
+            var operation = "add"
+            for (word in words) {
+                if (word == "plus" || word == "+") operation = "add"
+                else if (word == "minus" || word == "-") operation = "subtract"
+                else if (word == "times" || word == "*" || word == "x") operation = "multiply"
+                else if (word == "divided" || word == "/") operation = "divide"
+                else {
+                    val num = word.toDoubleOrNull()
+                    if (num != null) {
+                        if (result == 0.0) result = num
+                        else {
+                            when (operation) {
+                                "add" -> result += num
+                                "subtract" -> result -= num
+                                "multiply" -> result *= num
+                                "divide" -> result /= num
+                            }
+                        }
+                    }
+                }
+            }
+            return "The answer is $result"
+        } catch (e: Exception) {
+             return "I couldn't calculate that."
         }
     }
 
@@ -73,8 +119,15 @@ class ActionExecutor(private val context: Context) {
 
     private fun findAndOpenApp(appName: String): String {
         val packageManager = context.packageManager
-        val installedApps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
         
+        // Exact package match first check
+        val exactIntent = packageManager.getLaunchIntentForPackage(appName)
+        if (exactIntent != null) {
+            exactIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            return startIntent(exactIntent, "Opening app.")
+        }
+
+        val installedApps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
         for (appInfo in installedApps) {
             val appLabel = packageManager.getApplicationLabel(appInfo).toString().lowercase()
             if (appLabel == appName.lowercase()) {
