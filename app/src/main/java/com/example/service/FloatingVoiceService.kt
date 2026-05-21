@@ -50,6 +50,13 @@ class FloatingVoiceService : LifecycleService() {
         customCommandRepo = CustomCommandRepository(db.customCommandDao())
         commandHistoryRepo = CommandHistoryRepository(db.commandHistoryDao())
 
+        serviceScope.launch {
+            val settingsRepo = com.example.voice.data.SettingsRepository(this@FloatingVoiceService)
+            settingsRepo.voiceFlow.collect { voiceIdx ->
+                ttsManager.setVoiceStyle(voiceIdx)
+            }
+        }
+
         floatingViewHelper = FloatingViewHelper(this, {
              if (speechManager.speechState.value is SpeechState.Listening || speechManager.speechState.value is SpeechState.Processing) {
                  speechManager.stopListening()

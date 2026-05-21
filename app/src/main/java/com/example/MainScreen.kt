@@ -49,6 +49,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
     val uiState by viewModel.uiState.collectAsState()
     val isDarkMode by viewModel.isDarkMode.collectAsState()
     val themeIndex by viewModel.themeIndex.collectAsState()
+    val voiceIndex by viewModel.voiceIndex.collectAsState()
     val customCommands by viewModel.allCustomCommands.collectAsState()
     val commandHistory by viewModel.commandHistory.collectAsState()
     
@@ -148,9 +149,12 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
             SettingsDialog(
                 isDarkMode = isDarkMode,
                 themeIndex = themeIndex,
+                voiceIndex = voiceIndex,
                 onDismiss = { showSettingsDialog = false },
                 onDarkModeToggle = { viewModel.setDarkMode(it) },
-                onThemeSelected = { viewModel.setTheme(it) }
+                onThemeSelected = { viewModel.setTheme(it) },
+                onVoiceSelected = { viewModel.setVoiceType(it) },
+                context = context
             )
         }
 
@@ -362,44 +366,96 @@ fun VoiceAssistantContent(
 fun SettingsDialog(
     isDarkMode: Boolean,
     themeIndex: Int,
+    voiceIndex: Int,
     onDismiss: () -> Unit,
     onDarkModeToggle: (Boolean) -> Unit,
-    onThemeSelected: (Int) -> Unit
+    onThemeSelected: (Int) -> Unit,
+    onVoiceSelected: (Int) -> Unit,
+    context: android.content.Context
 ) {
-    val themes = listOf("Ocean", "Emerald", "Violet", "Rose", "Sunset", "Slate")
+    val themes = listOf("Ocean", "Emerald", "Violet", "Rose", "Sunset", "Slate", "Midnight", "Neon", "Mint")
+    val voices = listOf("Default", "Sweet", "Mature", "Friendly", "Calm", "Natural")
 
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text("Settings") },
         text = {
-            Column {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
-                ) {
-                    Text("Dark Mode", modifier = Modifier.weight(1f))
-                    Switch(checked = isDarkMode, onCheckedChange = onDarkModeToggle)
+            LazyColumn {
+                item {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp)
+                    ) {
+                        Text("Dark Mode", modifier = Modifier.weight(1f))
+                        Switch(checked = isDarkMode, onCheckedChange = onDarkModeToggle)
+                    }
+                    
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    Button(
+                        onClick = {
+                            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                            context.startActivity(intent)
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text("Allow Background Execution")
+                    }
+
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Voice Assistant Identity", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
                 }
                 
-                Spacer(modifier = Modifier.height(16.dp))
-                Text("Theme", style = MaterialTheme.typography.titleSmall)
-                Spacer(modifier = Modifier.height(8.dp))
+                items(voices.size) { index ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { onVoiceSelected(index) }
+                            .padding(vertical = 4.dp)
+                    ) {
+                        RadioButton(
+                            selected = voiceIndex == index,
+                            onClick = { onVoiceSelected(index) }
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(voices[index])
+                    }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("App Theme", style = MaterialTheme.typography.titleMedium, color = MaterialTheme.colorScheme.primary)
+                    Spacer(modifier = Modifier.height(8.dp))
+                }
                 
-                themes.forEachIndexed { index, themeName ->
+                items(themes.size) { index ->
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
                             .clickable { onThemeSelected(index) }
-                            .padding(vertical = 8.dp)
+                            .padding(vertical = 4.dp)
                     ) {
                         RadioButton(
                             selected = themeIndex == index,
                             onClick = { onThemeSelected(index) }
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(themeName)
+                        Text(themes[index])
                     }
+                }
+
+                item {
+                    Spacer(modifier = Modifier.height(24.dp))
+                    Text(
+                        "Made with love by Editingcells", 
+                        style = MaterialTheme.typography.bodySmall, 
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.6f),
+                        modifier = Modifier.fillMaxWidth(),
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         },

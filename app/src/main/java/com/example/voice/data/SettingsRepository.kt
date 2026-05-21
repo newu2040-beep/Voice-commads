@@ -13,6 +13,7 @@ class SettingsRepository(private val context: Context) {
     companion object {
         val THEME_KEY = intPreferencesKey("theme_key")
         val IS_DARK_MODE_KEY = booleanPreferencesKey("is_dark_mode_key")
+        val VOICE_KEY = intPreferencesKey("voice_key")
     }
 
     val themeFlow: Flow<Int> = context.dataStore.data.map { preferences ->
@@ -21,6 +22,10 @@ class SettingsRepository(private val context: Context) {
 
     val isDarkModeFlow: Flow<Boolean> = context.dataStore.data.map { preferences ->
         preferences[IS_DARK_MODE_KEY] ?: false
+    }
+
+    val voiceFlow: Flow<Int> = context.dataStore.data.map { preferences ->
+        preferences[VOICE_KEY] ?: 0
     }
 
     suspend fun setTheme(themeIndex: Int) {
@@ -32,6 +37,12 @@ class SettingsRepository(private val context: Context) {
     suspend fun setDarkMode(isDark: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[IS_DARK_MODE_KEY] = isDark
+        }
+    }
+    
+    suspend fun setVoice(voiceIndex: Int) {
+        context.dataStore.edit { preferences ->
+            preferences[VOICE_KEY] = voiceIndex
         }
     }
 }

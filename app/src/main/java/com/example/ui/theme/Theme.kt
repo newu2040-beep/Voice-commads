@@ -24,6 +24,9 @@ fun MyApplicationTheme(
         3 -> RosePrimary
         4 -> SunsetPrimary
         5 -> SlatePrimary
+        6 -> MidnightPrimary
+        7 -> NeonPrimary
+        8 -> MintPrimary
         else -> OceanPrimary
     }
     
@@ -33,6 +36,9 @@ fun MyApplicationTheme(
         3 -> RoseBackgroundLight
         4 -> SunsetBackgroundLight
         5 -> SlateBackgroundLight
+        6 -> MidnightBackgroundLight
+        7 -> NeonBackgroundLight
+        8 -> MintBackgroundLight
         else -> OceanBackgroundLight
     }
 
@@ -42,6 +48,9 @@ fun MyApplicationTheme(
         3 -> RoseBorderLight
         4 -> SunsetBorderLight
         5 -> SlateBorderLight
+        6 -> MidnightBorderLight
+        7 -> NeonBorderLight
+        8 -> MintBorderLight
         else -> OceanBorderLight
     }
 

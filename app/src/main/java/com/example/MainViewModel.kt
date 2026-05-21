@@ -47,10 +47,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
     val isDarkMode: StateFlow<Boolean> = settingsRepo.isDarkModeFlow
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
 
+    val voiceIndex: StateFlow<Int> = settingsRepo.voiceFlow
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0)
+
     private val _uiState = MutableStateFlow(VoiceUiState())
     val uiState: StateFlow<VoiceUiState> = _uiState.asStateFlow()
 
     init {
+        viewModelScope.launch {
+            settingsRepo.voiceFlow.collect { voiceIdx ->
+                ttsManager.setVoiceStyle(voiceIdx)
+            }
+        }
+        
         viewModelScope.launch {
             speechManager.speechState.collect { state ->
                 when (state) {
@@ -147,6 +156,10 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
 
     fun setDarkMode(dark: Boolean) {
          viewModelScope.launch { settingsRepo.setDarkMode(dark) }
+    }
+
+    fun setVoiceType(voiceInd: Int) {
+         viewModelScope.launch { settingsRepo.setVoice(voiceInd) }
     }
 
     override fun onCleared() {

@@ -26,6 +26,17 @@ class TTSManager(context: Context) : TextToSpeech.OnInitListener {
         }
     }
 
+    fun setVoiceStyle(type: Int) {
+        when (type) {
+            1 -> { tts?.setPitch(1.3f); tts?.setSpeechRate(1.0f) } // Sweet
+            2 -> { tts?.setPitch(0.7f); tts?.setSpeechRate(0.85f) } // Mature
+            3 -> { tts?.setPitch(1.1f); tts?.setSpeechRate(1.1f) } // Friendly
+            4 -> { tts?.setPitch(0.9f); tts?.setSpeechRate(0.85f) } // Calm
+            5 -> { tts?.setPitch(1.0f); tts?.setSpeechRate(1.0f) } // Natural
+            else -> { tts?.setPitch(1.0f); tts?.setSpeechRate(1.0f) } // Default
+        }
+    }
+
     fun speak(text: String) {
         if (isInitialized) {
             tts?.speak(text, TextToSpeech.QUEUE_FLUSH, null, null)

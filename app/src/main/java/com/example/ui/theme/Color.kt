@@ -35,6 +35,21 @@ val SlatePrimary = Color(0xFF475569)
 val SlateBackgroundLight = Color(0xFFF8FAFC)
 val SlateBorderLight = Color(0xFFE2E8F0)
 
+// Theme 6: Midnight
+val MidnightPrimary = Color(0xFF6366F1)
+val MidnightBackgroundLight = Color(0xFFEFF6FF)
+val MidnightBorderLight = Color(0xFFDBEAFE)
+
+// Theme 7: Neon
+val NeonPrimary = Color(0xFF14B8A6)
+val NeonBackgroundLight = Color(0xFFF0FDFA)
+val NeonBorderLight = Color(0xFFCCFBF1)
+
+// Theme 8: Mint
+val MintPrimary = Color(0xFF10B981)
+val MintBackgroundLight = Color(0xFFF0FDF4)
+val MintBorderLight = Color(0xFFDCFCE7)
+
 val TextDark = Color(0xFF1A1C1E)
 val TextSecondary = Color(0xFF5E6272)
 val TextDarkInverse = Color(0xFFE2E2E6)
