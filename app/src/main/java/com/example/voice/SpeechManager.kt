@@ -14,14 +14,20 @@ import java.util.Locale
 
 class SpeechManager(private val context: Context) : RecognitionListener {
     
-    private val speechRecognizer: SpeechRecognizer = SpeechRecognizer.createSpeechRecognizer(context)
+    private var speechRecognizer: SpeechRecognizer? = null
     private val recognizerIntent: Intent
     
     private val _speechState = MutableStateFlow<SpeechState>(SpeechState.Idle)
     val speechState: StateFlow<SpeechState> = _speechState.asStateFlow()
 
     init {
-        speechRecognizer.setRecognitionListener(this)
+        try {
+            speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                setRecognitionListener(this@SpeechManager)
+            }
+        } catch (e: Exception) {
+            Log.e("SpeechManager", "Failed to create SpeechRecognizer: ${e.message}")
+        }
         recognizerIntent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
@@ -33,15 +39,36 @@ class SpeechManager(private val context: Context) : RecognitionListener {
 
     fun startListening() {
         _speechState.value = SpeechState.Listening("Listening...")
-        speechRecognizer.startListening(recognizerIntent)
+        try {
+            val sr = speechRecognizer
+            if (sr != null) {
+                sr.startListening(recognizerIntent)
+            } else {
+                speechRecognizer = SpeechRecognizer.createSpeechRecognizer(context).apply {
+                    setRecognitionListener(this@SpeechManager)
+                    startListening(recognizerIntent)
+                }
+            }
+        } catch (e: Exception) {
+            _speechState.value = SpeechState.Error("Voice helper is unavailable on this device.")
+            Log.e("SpeechManager", "Failed to start listening: ${e.message}")
+        }
     }
 
     fun stopListening() {
-        speechRecognizer.stopListening()
+        try {
+            speechRecognizer?.stopListening()
+        } catch (e: Exception) {
+            Log.e("SpeechManager", "Failed to stop listening: ${e.message}")
+        }
     }
 
     fun destroy() {
-        speechRecognizer.destroy()
+        try {
+            speechRecognizer?.destroy()
+        } catch (e: Exception) {
+            Log.e("SpeechManager", "Failed to destroy: ${e.message}")
+        }
     }
 
     override fun onReadyForSpeech(params: Bundle?) {}

@@ -97,7 +97,11 @@ class FloatingViewHelper(private val context: Context, private val onMicClick: (
             y = 300
         }
 
-        windowManager.addView(composeView, params)
+        try {
+            windowManager.addView(composeView, params)
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     fun hide() {
@@ -105,7 +109,11 @@ class FloatingViewHelper(private val context: Context, private val onMicClick: (
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_PAUSE)
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_STOP)
             lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_DESTROY)
-            windowManager.removeView(it)
+            try {
+                windowManager.removeView(it)
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
             composeView = null
         }
     }

@@ -100,7 +100,19 @@ class FloatingVoiceService : LifecycleService() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
-        startForeground(1, createNotification())
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                startForeground(
+                    1, 
+                    createNotification(), 
+                    android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_MICROPHONE
+                )
+            } else {
+                startForeground(1, createNotification())
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         return START_NOT_STICKY
     }
 

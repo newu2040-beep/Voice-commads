@@ -108,8 +108,10 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                                 context.startService(intent)
                             }
                         } else {
-                            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
-                            context.startActivity(intent)
+                            try {
+                                val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:${context.packageName}"))
+                                context.startActivity(intent)
+                            } catch (e: Exception) {}
                         }
                     }) {
                         Icon(imageVector = Icons.Filled.PlayArrow, contentDescription = "Start Floating Bubble", tint = MaterialTheme.colorScheme.onBackground)
@@ -154,6 +156,7 @@ fun MainScreen(viewModel: MainViewModel = viewModel()) {
                 onDarkModeToggle = { viewModel.setDarkMode(it) },
                 onThemeSelected = { viewModel.setTheme(it) },
                 onVoiceSelected = { viewModel.setVoiceType(it) },
+                onVoicePreview = { viewModel.previewVoice(it) },
                 context = context
             )
         }
@@ -371,6 +374,7 @@ fun SettingsDialog(
     onDarkModeToggle: (Boolean) -> Unit,
     onThemeSelected: (Int) -> Unit,
     onVoiceSelected: (Int) -> Unit,
+    onVoicePreview: (Int) -> Unit,
     context: android.content.Context
 ) {
     val themes = listOf("Ocean", "Emerald", "Violet", "Rose", "Sunset", "Slate", "Midnight", "Neon", "Mint")
@@ -394,8 +398,16 @@ fun SettingsDialog(
                     
                     Button(
                         onClick = {
-                            val intent = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
-                            context.startActivity(intent)
+                            try {
+                                val intent = Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS)
+                                intent.data = Uri.parse("package:${context.packageName}")
+                                context.startActivity(intent)
+                            } catch (e: Exception) {
+                                try {
+                                    val intent2 = Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS)
+                                    context.startActivity(intent2)
+                                } catch (e2: Exception) {}
+                            }
                         },
                         modifier = Modifier.fillMaxWidth()
                     ) {
@@ -412,15 +424,32 @@ fun SettingsDialog(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier
                             .fillMaxWidth()
-                            .clickable { onVoiceSelected(index) }
+                            .clickable {
+                                onVoiceSelected(index)
+                                onVoicePreview(index)
+                            }
                             .padding(vertical = 4.dp)
                     ) {
                         RadioButton(
                             selected = voiceIndex == index,
-                            onClick = { onVoiceSelected(index) }
+                            onClick = {
+                                onVoiceSelected(index)
+                                onVoicePreview(index)
+                            }
                         )
                         Spacer(modifier = Modifier.width(8.dp))
-                        Text(voices[index])
+                        Text(voices[index], modifier = Modifier.weight(1f))
+                        IconButton(
+                            onClick = { onVoicePreview(index) },
+                            modifier = Modifier.size(36.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.PlayArrow,
+                                contentDescription = "Preview voice ${voices[index]}",
+                                tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        }
                     }
                 }
 

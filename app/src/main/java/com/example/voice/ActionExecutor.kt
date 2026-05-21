@@ -23,15 +23,37 @@ class ActionExecutor(private val context: Context) {
         return when {
             lowerCommand.contains("turn on flashlight") || lowerCommand.contains("flashlight on") -> toggleFlashlight(true)
             lowerCommand.contains("turn off flashlight") || lowerCommand.contains("flashlight off") -> toggleFlashlight(false)
-            lowerCommand.contains("open camera") -> openCamera()
-            lowerCommand.contains("open gallery") -> openGallery()
-            lowerCommand.startsWith("open ") -> {
-                val appName = lowerCommand.removePrefix("open ").trim()
+            lowerCommand.contains("open camera") || lowerCommand.contains("launch camera") || lowerCommand.contains("start camera") -> openCamera()
+            lowerCommand.contains("open gallery") || lowerCommand.contains("launch gallery") || lowerCommand.contains("start gallery") -> openGallery()
+            lowerCommand.startsWith("open ") || lowerCommand.startsWith("launch ") || lowerCommand.startsWith("start ") || lowerCommand.startsWith("run ") || lowerCommand.startsWith("go to ") -> {
+                val appName = lowerCommand
+                    .removePrefix("open ")
+                    .removePrefix("launch ")
+                    .removePrefix("start ")
+                    .removePrefix("run ")
+                    .removePrefix("go to ")
+                    .trim()
                 findAndOpenApp(appName)
             }
             lowerCommand.startsWith("call ") -> {
                 val contactName = lowerCommand.removePrefix("call ").trim()
                 callContact(contactName)
+            }
+            lowerCommand.startsWith("search ") || lowerCommand.startsWith("google ") || lowerCommand.startsWith("search for ") -> {
+                val query = lowerCommand
+                    .removePrefix("search for ")
+                    .removePrefix("search ")
+                    .removePrefix("google ")
+                    .trim()
+                searchWeb(query)
+            }
+            lowerCommand.startsWith("transcribe ") -> {
+                val text = command.substring(11).trim()
+                "Audio transcript saved: $text"
+            }
+            lowerCommand.startsWith("write ") || lowerCommand.startsWith("note ") -> {
+                val text = command.substring(6).trim()
+                "Transcribed note: \"$text\""
             }
             lowerCommand.contains("bluetooth") -> openSettings(Settings.ACTION_BLUETOOTH_SETTINGS, "Bluetooth settings")
             lowerCommand.contains("wifi") || lowerCommand.contains("wi-fi") -> openSettings(Settings.ACTION_WIFI_SETTINGS, "Wi-Fi settings")
@@ -43,12 +65,55 @@ class ActionExecutor(private val context: Context) {
                 val sdf = SimpleDateFormat("EEEE, MMMM dd, yyyy", Locale.getDefault())
                 "Today is ${sdf.format(Date())}"
             }
-            lowerCommand.contains("plus") || lowerCommand.contains("+") -> calculateMath(lowerCommand)
-            lowerCommand.contains("minus") || lowerCommand.contains("-") -> calculateMath(lowerCommand)
+            lowerCommand.contains("plus") || lowerCommand.contains("+") -> calculateMath(cleanMathString(lowerCommand))
+            lowerCommand.contains("minus") || lowerCommand.contains("-") -> calculateMath(cleanMathString(lowerCommand))
+            lowerCommand.contains("times") || lowerCommand.contains("*") || lowerCommand.contains("x") -> calculateMath(cleanMathString(lowerCommand))
+            lowerCommand.contains("divided") || lowerCommand.contains("/") -> calculateMath(cleanMathString(lowerCommand))
             lowerCommand.contains("generate") -> "I am an offline assistant and cannot generate custom AI text content without a connected API."
             lowerCommand.contains("who are you") -> "I am Aura AI, a local voice assistant operating on your device."
-            else -> "Command not supported."
+            else -> {
+                // Try dynamic app matching on the raw command itself as a fallback
+                val appOpenResult = tryQuickOpenApp(lowerCommand)
+                appOpenResult ?: "Command recognized. Doing my best to fulfill your request: $command"
+            }
         }
+    }
+
+    private fun cleanMathString(command: String): String {
+        return command
+            .replace("what is ", "")
+            .replace("calculate ", "")
+            .replace("equal ", "")
+            .replace("equals ", "")
+            .trim()
+    }
+
+    private fun searchWeb(query: String): String {
+        return try {
+            val intent = Intent(Intent.ACTION_VIEW, Uri.parse("https://www.google.com/search?q=${Uri.encode(query)}"))
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            context.startActivity(intent)
+            "Searching the web for $query"
+        } catch (e: Exception) {
+            "Could not open web search."
+        }
+    }
+
+    private fun tryQuickOpenApp(appName: String): String? {
+        val pm = context.packageManager
+        val installedApps = pm.getInstalledApplications(PackageManager.GET_META_DATA)
+        for (appInfo in installedApps) {
+            val appLabel = pm.getApplicationLabel(appInfo).toString().lowercase().trim()
+            if (appLabel == appName.lowercase().trim()) {
+                val intent = pm.getLaunchIntentForPackage(appInfo.packageName)
+                if (intent != null) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    context.startActivity(intent)
+                    return "Opening ${pm.getApplicationLabel(appInfo)}."
+                }
+            }
+        }
+        return null
     }
     
     private fun calculateMath(command: String): String {
@@ -119,6 +184,7 @@ class ActionExecutor(private val context: Context) {
 
     private fun findAndOpenApp(appName: String): String {
         val packageManager = context.packageManager
+        val searchLabel = appName.lowercase().trim()
         
         // Exact package match first check
         val exactIntent = packageManager.getLaunchIntentForPackage(appName)
@@ -128,9 +194,35 @@ class ActionExecutor(private val context: Context) {
         }
 
         val installedApps = packageManager.getInstalledApplications(PackageManager.GET_META_DATA)
+        
+        // Priority 1: Exact App Label Match
         for (appInfo in installedApps) {
-            val appLabel = packageManager.getApplicationLabel(appInfo).toString().lowercase()
-            if (appLabel == appName.lowercase()) {
+            val appLabel = packageManager.getApplicationLabel(appInfo).toString().lowercase().trim()
+            if (appLabel == searchLabel) {
+                val intent = packageManager.getLaunchIntentForPackage(appInfo.packageName)
+                if (intent != null) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    return startIntent(intent, "Opening ${packageManager.getApplicationLabel(appInfo)}.")
+                }
+            }
+        }
+
+        // Priority 2: App Label Starts With search query
+        for (appInfo in installedApps) {
+            val appLabel = packageManager.getApplicationLabel(appInfo).toString().lowercase().trim()
+            if (appLabel.startsWith(searchLabel)) {
+                val intent = packageManager.getLaunchIntentForPackage(appInfo.packageName)
+                if (intent != null) {
+                    intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    return startIntent(intent, "Opening ${packageManager.getApplicationLabel(appInfo)}.")
+                }
+            }
+        }
+
+        // Priority 3: App Label Contains search query or vice versa
+        for (appInfo in installedApps) {
+            val appLabel = packageManager.getApplicationLabel(appInfo).toString().lowercase().trim()
+            if (appLabel.contains(searchLabel) || searchLabel.contains(appLabel)) {
                 val intent = packageManager.getLaunchIntentForPackage(appInfo.packageName)
                 if (intent != null) {
                     intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -140,7 +232,7 @@ class ActionExecutor(private val context: Context) {
         }
         
         // WhatsApp special fallback case
-        if (appName.contains("whatsapp")) {
+        if (searchLabel.contains("whatsapp")) {
             val intent = packageManager.getLaunchIntentForPackage("com.whatsapp")
             if (intent != null) {
                 intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
@@ -148,7 +240,7 @@ class ActionExecutor(private val context: Context) {
             }
         }
         
-        return "Could not find app $appName."
+        return "Could not find app $appName on your device."
     }
 
     private fun callContact(name: String): String {

@@ -162,6 +162,19 @@ class MainViewModel(application: Application) : AndroidViewModel(application) {
          viewModelScope.launch { settingsRepo.setVoice(voiceInd) }
     }
 
+    fun previewVoice(voiceInd: Int) {
+        val sampleText = when (voiceInd) {
+            1 -> "Hello, this is my sweet voice style."
+            2 -> "Hello, this is my mature voice style."
+            3 -> "Hello, this is my friendly voice style."
+            4 -> "Hello, this is my calm voice style."
+            5 -> "Hello, this is my natural voice style."
+            else -> "Hello, this is my default voice style."
+        }
+        ttsManager.setVoiceStyle(voiceInd)
+        ttsManager.speak(sampleText)
+    }
+
     override fun onCleared() {
         super.onCleared()
         speechManager.destroy()
